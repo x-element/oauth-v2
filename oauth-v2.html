@@ -1,23 +1,24 @@
-<link rel="import" href="../polymer/polymer.html">
 <link rel="import" href="../iron-ajax/iron-ajax.html">
 <link rel="import" href="../oauth-popup/oauth-popup.html">
 <link rel="import" href="../oauth-session/oauth-session.html">
 <dom-module id="oauth-v2">
-  <style>
-    :host {
-      display: none;
-    }
-  </style>
   <template>
+    <style>
+      :host {
+        display: none;
+      }
+    </style>
 
-    <oauth-popup id="popup"
+    <oauth-popup id="popup" url="{{url}}"
       width="{{popupWidth}}" height="{{popupHeight}}"
-      url="{{url}}" response="{{response}}">
+      response="{{response}}" on-response="on_response"
+      error="{{error}}" on-error="on_error">
     </oauth-popup>
 
     <iron-ajax id="exchange" method="POST" url="{{exchange_url}}"
       content-type="application/json" body="{{exchange_body}}"
-      handle-as="json" last-response="{{exchange_response}}">
+      handle-as="json" last-response="{{exchange_response}}" on-response="on_response_exchange"
+      last-error="{{error}}" on-error="on_error">
     </iron-ajax>
 
     <oauth-session id="session" token="{{token}}"></oauth-session>
@@ -83,8 +84,11 @@
       },
       response: {
         type: Object,
-        notify: true,
-        observer: 'on_response'
+        notify: true
+      },
+      error: {
+        type: Object,
+        notify: true
       },
       exchange_url: {
         type: String
@@ -156,7 +160,8 @@
       return url;
     },
 
-    on_response: function (response) {
+    on_response: function (event) {
+      event.stopPropagation();
       this._exchange();
     },
 
@@ -199,7 +204,8 @@
       return body;
     },
 
-    on_exchange_response: function () {
+    on_response_exchange: function (event) {
+      event.stopPropagation();
       this.$.session.set_token(this.exchange_response);
     }
 
