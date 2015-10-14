@@ -1,6 +1,5 @@
 <link rel="import" href="../iron-ajax/iron-ajax.html">
 <link rel="import" href="../oauth-popup/oauth-popup.html">
-<link rel="import" href="../oauth-session/oauth-session.html">
 <dom-module id="oauth-v2">
   <template>
     <style>
@@ -11,17 +10,15 @@
 
     <oauth-popup id="popup" url="{{url}}"
       width="{{popupWidth}}" height="{{popupHeight}}"
-      response="{{response}}" on-response="on_response"
+      response="{{response_token}}" on-response="on_response_token"
       error="{{error}}" on-error="on_error">
     </oauth-popup>
 
     <iron-ajax id="exchange" method="POST" url="{{exchange_url}}"
       content-type="application/json" body="{{exchange_body}}"
-      handle-as="json" last-response="{{exchange_response}}" on-response="on_response_exchange"
+      handle-as="json" last-response="{{response_exchange}}" on-response="on_response_exchange"
       last-error="{{error}}" on-error="on_error">
     </iron-ajax>
-
-    <oauth-session id="session" token="{{token}}"></oauth-session>
 
   </template>
 </dom-module>
@@ -31,12 +28,6 @@
     is: 'oauth-v2',
 
     properties: {
-      name: {
-        type: String
-      },
-      state: {
-        type: String
-      },
       scope: {
         type: Array
       },
@@ -60,12 +51,6 @@
         type: Array,
         value: ['response_type', 'client_id', 'redirect_uri']
       },
-      querystring: {
-        type: String
-      },
-      url: {
-        type: String
-      },
       response_type: {
         type: String,
         value: 'code'
@@ -82,44 +67,34 @@
       popupHeight: {
         type: Number
       },
-      response: {
+      response_token: {
         type: Object,
-        notify: true
+      },
+      exchange_url: {
+        type: String
+      },
+      response_exchange: {
+        type: Object
       },
       error: {
         type: Object,
         notify: true
       },
-      exchange_url: {
-        type: String
-      },
-      exchange_body: {
-        type: String
-      },
-      exchange_response: {
+      response: {
         type: Object,
-        observer: 'on_exchange_response'
-      },
-      token: {
-        type: Object
+        notify: true
       }
     },
 
     open: function () {
-      this._set_state();
-      this.querystring = this._compute_querystring();
       this.url = this._compute_url();
       this.$.popup.open();
     },
 
-    _get_state: function () {
-      var state_name = this.name + '_state';
-      window.localStorage.getItem(state_name);
-    },
-
-    _set_state: function () {
-      var state_name = this.name + '_state';
-      window.localStorage.setItem(state_name, this.state)
+    _compute_url: function () {
+      var querystring = this._compute_querystring();
+      var url = this.endpoint + '?' + querystring;
+      return url;
     },
 
     _compute_querystring: function () {
@@ -136,11 +111,6 @@
       scope.urlParams.forEach(function (param) {
         value = scope[param];
 
-        if (param === 'state') {
-          param = scope.name + '_state';
-          value = window.localStorage.getItem(param);
-        }
-
         if (param === 'scope') {
           if (scope.scopePrefix) {
             value.unshift(scope.scopePrefix);
@@ -155,35 +125,24 @@
       return querystring;
     },
 
-    _compute_url: function () {
-      var url = this.endpoint + '?' + this.querystring;
-      return url;
-    },
-
-    on_response: function (event) {
+    on_response_token: function (event) {
       event.stopPropagation();
       this._exchange();
     },
 
     _exchange: function () {
       if (this.response_type === 'token') {
-        this.token = this.response;
+        this.response = this.response_token;
+        this.fire('response', this.response);
         return;
       }
-
-      var state = this._get_state();
-      if (this.response.state && this.response.state !== state) {
-        throw new Error('OAuth 2.0 state parameter mismatch.');
-      }
-
       this.exchange_body = this._compute_exchange_body();
-
       this.$.exchange.generateRequest();
     },
 
     _compute_exchange_body: function () {
       var body = {};
-      var response = this.response;
+      var response = this.response_token;
       var responseParams = this.responseParams;
       var key;
 
@@ -206,7 +165,13 @@
 
     on_response_exchange: function (event) {
       event.stopPropagation();
-      this.$.session.set_token(this.exchange_response);
+      this.response = this.response_exchange;
+      this.fire('response', this.response)
+    },
+
+    on_error: function (event) {
+      event.stopPropagation();
+      this.fire('error', this.error);
     }
 
   });
